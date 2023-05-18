@@ -153,22 +153,73 @@ view(planes_updated)
 ```
 
 ```{r}
-library(tidyverse)
+library(nycflights13)
+library(ggplot2)
 
-view(weather)
+data(weather)  # Load the "weather" dataset
 
-skim(weather)
+july_weather <- filter(weather, month == 7 & !is.na(wind_speed))  # Filter for July temperatures
+
+median_temp <- median(july_weather$temp)
+mean_temp <- mean(july_weather$temp)
+sd_temp <- sd(july_weather$temp)
+
+median_wind_speed <- median(july_weather$wind_speed)
+mean_wind_speed <- mean(july_weather$wind_speed)
+sd_wind_speed <- sd(july_weather$wind_speed)
+
+ggplot(july_weather, aes(x = temp, y = ..density..)) +
+  geom_density(fill = "skyblue", color = "black") +
+  geom_vline(aes(xintercept = median_temp), color = "blue", linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = mean_temp), color = "green", linetype = "dashed", size = 1) +
+  annotate("text", x = mean_temp + 11, y = 0.04, label = paste("Median =",round(median_temp,2)), color = "blue", vjust = -1) +
+  annotate("text", x = mean_temp + 11, y = 0.035, label = paste("Mean =",round(mean_temp,2)), color = "green", vjust = -1) +
+   annotate("text", x = mean_temp +11, y = 0.03, label = paste("SD =", round(sd_temp, 2)), color = "red", vjust = -1) +
+  labs(x = "Temperature", y = "Frequency") +
+  ggtitle("The average temperature in July was 80 degrees") +
+  theme_minimal() +
+  theme(plot.margin = margin(0.8, 0.8, 0, 0.8, "cm"))
 
 
-temp_distribution_july<-weather %>% 
-  filter(month=="july") %>% 
-  summarise(mean_temp_july=mean(weather$temp, na.rm=TRUE)) %>% 
-  summarise(median_temp_july=median(weather$temp, na.rm=TRUE)) %>% 
-  summarise(max_temp_july=max(weather$temp, na.rm=TRUE) %>% 
-  summarise(min_temp_july=min(weather$temp, na.rm=TRUE)) %>%
-  summarise(sd_temp_july=sd(weather$temp, na.rm=TRUE))
+ggplot(july_weather, aes(x = "", y = wind_speed)) +
+  geom_boxplot(fill = "skyblue", color = "black") +
+  geom_point(data = filter(july_weather, wind_speed > quantile(wind_speed, 0.95) |
+                                            wind_speed < quantile(wind_speed, 0.05)),
+             aes(x = 1, y = wind_speed), color = "red", shape = 16, size = 3) +
+  labs(x = "", y = "Wind Speed") +
+ annotate("text", x = 1, y = mean_wind_speed + 2, label = paste("Mean:", round(mean_wind_speed, 2)),
+           color = "green", size = 3, hjust = 0, vjust = 0) +
+  annotate("text", x = 1, y = mean_wind_speed + 1, label = paste("SD:", round(sd_wind_speed, 2)),
+           color = "green", size = 3, hjust = 0, vjust = 0) +
+  ggtitle("Wind speed in July was mostly between 5 and 15 mph") +
+  theme_minimal()
 
-view(temp_distribution_july)
+
+correlation_humid_dewp <- cor(weather$humid, weather$dewp, use = "complete.obs")
+
+ggplot(weather, aes(x = humid, y = dewp)) +
+  geom_point(color = "skyblue", alpha = 0.7) +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  geom_text(x = max(weather$humid, na.rm = TRUE), y = min(weather$dewp, na.rm = TRUE),
+            label = paste("Correlation:", round(correlation_humid_dewp, 4)), hjust = 1, vjust = 0,
+            color = "black", size = 4) +
+  labs(x = "Humidity", y = "Dew Point") +
+  ggtitle("Dew point tends to rise as humidity rises") +
+  theme_minimal()
+
+
+correlation_precip_visib <- cor(weather$precip, weather$visib, use = "complete.obs")
+
+ggplot(weather, aes(x = precip, y = visib)) +
+  geom_point(color = "skyblue", alpha = 0.7) +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  geom_text(x = max(weather$precip, na.rm = TRUE), y = min(weather$visib, na.rm = TRUE),
+            label = paste("Correlation:", round(correlation_precip_visib, 4)), hjust = 1.5, vjust = -2,
+            color = "black", size = 4) +
+  labs(x = "Precipitation", y = "Visibility") +
+  ggtitle("Visibility tends to fall as precipitation rises, but the relationship is not strong") +
+  theme_minimal()+
+  ylim(0,NA)
 ```
 
 ## Problem 5: Use the `flights` and `planes` tables to answer the following questions:
@@ -199,11 +250,7 @@ manufacturer_count <- planes %>%
   summarise(count=n()) %>% 
   arrange(desc(count))
 
-view(manufacturer_count)
-
 top_manufacturers <- top_n(manufacturer_count, 5, count)
-
-view(top_manufacturers)
 
 library(lubridate)
 
