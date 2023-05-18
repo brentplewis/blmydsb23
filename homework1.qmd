@@ -187,6 +187,12 @@ planes %>%
   filter(is.na(year)) %>% 
   count()
 
+top_manufacturers <- planes %>%
+  group_by(manufacturer) %>%
+  summarise(count = n()) %>%
+  top_n(5, wt = count) %>%
+  pull(manufacturer)
+
 manufacturer_count <- planes %>% 
   group_by(manufacturer) %>%
   mutate(manufacturer=recode(manufacturer,"AIRBUS INDUSTRIE" = "AIRBUS","MCDONNELL DOUGLAS AIRCRAFT CO" = "MCDONNELL DOUGLAS","MCDONNELL DOUGLAS CORPORATION" = "MCDONNELL DOUGLAS")) %>% 
@@ -211,11 +217,19 @@ flights_with_manufacturers <-right_join(completed_flights,planes %>%
                                          select(tailnum, manufacturer) %>% 
                                           mutate(manufacturer=recode(manufacturer,"AIRBUS INDUSTRIE" = "AIRBUS","MCDONNELL DOUGLAS AIRCRAFT CO" = "MCDONNELL DOUGLAS","MCDONNELL DOUGLAS CORPORATION" = "MCDONNELL DOUGLAS")), by = "tailnum")
 
-   
-view(flights_with_manufacturers)
+updated_flights_with_manufacturers <- flights_with_manufacturers %>%
+  mutate(manufacturer = case_when(
+    manufacturer %in% top_manufacturers$manufacturer ~ manufacturer,
+    TRUE ~ "Other")) %>% 
+  group_by(day_of_year,manufacturer) %>% 
+  summarise(count=n())
 
-flights_with_manufacturers %>% 
+view(updated_flights_with_manufacturers)
 
+ggplot(updated_flights_with_manufacturers, aes(x = day_of_year, y = count, fill = manufacturer, group = manufacturer)) +
+  geom_area() +
+  labs(x = "Time", y = "No. flights") +
+  theme_minimal()
 
 
 ```
