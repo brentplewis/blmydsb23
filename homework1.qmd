@@ -404,7 +404,7 @@ fly_into_sfo<- flights %>%
 # Count the number of flights for each name, recording this as "count"
   summarise(count = n()) %>%
 # Create a new column that records the count of each airline as a percentage of total flights to SFO
-  mutate(percent_to_sfo = count / sum(count) * 100)
+  mutate(percent_to_sfo = round(count / sum(count) * 100,2))
 
 fly_into_sfo
 ```
@@ -430,13 +430,13 @@ fly_into_sfo %>%
   geom_col() +
   
   # add labels, so each bar shows the % of total flights 
-  geom_text(aes(label = percent),
-             hjust = 1, 
+  geom_text(aes(label = percent_to_sfo),
+              hjust = 1, 
              colour = "white", 
              size = 5)+
   
   # add labels to help our audience  
-  labs(title="Which airline dominates the NYC to SFO route?", 
+  labs(title="United dominates the NYC to SFO route", 
        subtitle = "as % of total flights in 2013",
        x= "Number of flights",
        y= NULL) +
