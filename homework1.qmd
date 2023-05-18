@@ -127,21 +127,27 @@ For the plane with the greatest number of flights and that had more than 50 seat
 
 skim(flights)
 
-view(flights)
-  
-frequent_flyer<-flights %>% 
-  filter(origin %in% c("LGA","JFK", "EWR")) %>%
-  group_by(tailnum) %>% 
-  summarise(tail_num_flights = n()) %>%
-  arrange(desc(tail_num_flights))
-  
-view(frequent_flyer)
+# This code assumes that Newark Airport is not a New York City airport  
 
+# Create a new dataframe
+frequent_flyer<-flights %>%
+# Filter in only LGA and JFK (i.e. exclude EWR)
+  filter(origin %in% c("LGA","JFK")) %>%
+# Group by tail number (since we are counting flights on the basis of tail number)
+  group_by(tailnum) %>% 
+# Generate a new column called tail_num_flights, which is just a count of the total flights per each distinct tail number in the frequent_flyer dataframe
+  summarise(tail_num_flights = n()) %>%
+# Arrange in descending order (i.e. most flights at the top) 
+  arrange(desc(tail_num_flights))
+
+print(frequent_flyer)
+
+# Left join the frequent_flyer datafram to planes dataframe on the basis of tail number
 planes_updated <-planes %>% 
   left_join(frequent_flyer, by = "tailnum") %>% 
   arrange(desc(tail_num_flights))
 
-view(planes_updated)
+print(planes_updated)
 ```
 
 ## Problem 4: The `nycflights13` package includes a table (`weather`) that describes the weather during 2013. Use that table to answer the following questions:
@@ -153,13 +159,10 @@ view(planes_updated)
 ```
 
 ```{r}
-library(nycflights13)
-library(ggplot2)
+# Create a new tibble called july_weather by filtering the only for month 7 (i.e. July) and filtering out non-recorded wind_speed observations 
+july_weather <- filter(weather, month == 7 & !is.na(wind_speed))
 
-data(weather)  # Load the "weather" dataset
-
-july_weather <- filter(weather, month == 7 & !is.na(wind_speed))  # Filter for July temperatures
-
+# Create new tibbles for median, mean and standard deviation of the july_weather temp and wind_speed variables. We will use these later
 median_temp <- median(july_weather$temp)
 mean_temp <- mean(july_weather$temp)
 sd_temp <- sd(july_weather$temp)
@@ -168,46 +171,63 @@ median_wind_speed <- median(july_weather$wind_speed)
 mean_wind_speed <- mean(july_weather$wind_speed)
 sd_wind_speed <- sd(july_weather$wind_speed)
 
+# To show the distribution of temperatures in july_weather, create a density plot for temperatures, with temperature on the x-axis 
 ggplot(july_weather, aes(x = temp, y = ..density..)) +
   geom_density(fill = "skyblue", color = "black") +
+# Add dashed vertical lines for the median and mean temperatures
   geom_vline(aes(xintercept = median_temp), color = "blue", linetype = "dashed", size = 1) +
   geom_vline(aes(xintercept = mean_temp), color = "green", linetype = "dashed", size = 1) +
+#Write notes for each of the mean, median and standard deviation of temperature and line them up according to to the placement of the mean_temp recording on the x-axis
   annotate("text", x = mean_temp + 11, y = 0.04, label = paste("Median =",round(median_temp,2)), color = "blue", vjust = -1) +
   annotate("text", x = mean_temp + 11, y = 0.035, label = paste("Mean =",round(mean_temp,2)), color = "green", vjust = -1) +
    annotate("text", x = mean_temp +11, y = 0.03, label = paste("SD =", round(sd_temp, 2)), color = "red", vjust = -1) +
+# Label the x-axis "Temperature" and the y-axis "Frequency") 
   labs(x = "Temperature", y = "Frequency") +
+# Insert a title
   ggtitle("The average temperature in July was 80 degrees") +
   theme_minimal() +
+# Insert appropriate margins to expand or contract the graph size
   theme(plot.margin = margin(0.8, 0.8, 0, 0.8, "cm"))
 
-
+# To identify outliers, create a box plot of the wind_speed variable. Don't include anything on the x-axis, since we only need to show range in one variable and not necessarily over a specific period
 ggplot(july_weather, aes(x = "", y = wind_speed)) +
   geom_boxplot(fill = "skyblue", color = "black") +
-  geom_point(data = filter(july_weather, wind_speed > quantile(wind_speed, 0.95) |
-                                            wind_speed < quantile(wind_speed, 0.05)),
+# To show outliers, add a geom_point that filters in (from the wind_speed variable of the july_weather dataframe) only the wind_speed observations in the 99.7th or 0.3rd percentiles (i.e. ~ 3 standard deviations from the mean) and colour these red to make them distinct
+  geom_point(data = filter(july_weather, wind_speed > quantile(wind_speed, 0.997) |
+                                            wind_speed < quantile(wind_speed, 0.003)),
              aes(x = 1, y = wind_speed), color = "red", shape = 16, size = 3) +
   labs(x = "", y = "Wind Speed") +
- annotate("text", x = 1, y = mean_wind_speed + 2, label = paste("Mean:", round(mean_wind_speed, 2)),
+# Apply the same annotations as for the temp graph above
+  annotate("text", x = 1, y = mean_wind_speed + 2, label = paste("Mean:", round(mean_wind_speed, 2)),
            color = "green", size = 3, hjust = 0, vjust = 0) +
   annotate("text", x = 1, y = mean_wind_speed + 1, label = paste("SD:", round(sd_wind_speed, 2)),
            color = "green", size = 3, hjust = 0, vjust = 0) +
+# Apply a title that provides the conclusion
   ggtitle("Wind speed in July was mostly between 5 and 15 mph") +
   theme_minimal()
 
+# To show the relationship between the humidity and dew point measure, first create a new tibble recording the correlation coefficient of the humid and dewp variables in the weather dataframe (note that this question doesn't ask us to filter specifically for July).
 
-correlation_humid_dewp <- cor(weather$humid, weather$dewp, use = "complete.obs")
+correlation_humid_dewp <- cor(weather$humid, weather$dewp, use = "complete.obs") 
 
+# Use only complete observations (i.e. nothing recorded as "NA")
+
+# Map this relationship using a scatter plot, with humidity on the x-axis and dew point measurement on the y-axis
 ggplot(weather, aes(x = humid, y = dewp)) +
+# Since some of the points overlap, set the alpha (i.e. transparency) slightly above half (0.7 should do) to show overlapped points that don't distort the image
   geom_point(color = "skyblue", alpha = 0.7) +
+# Insert a line of best fit to demonstrate the relationship between the variables
   geom_smooth(method = "lm", color = "red", se = FALSE) +
-  geom_text(x = max(weather$humid, na.rm = TRUE), y = min(weather$dewp, na.rm = TRUE),
-            label = paste("Correlation:", round(correlation_humid_dewp, 4)), hjust = 1, vjust = 0,
-            color = "black", size = 4) +
-  labs(x = "Humidity", y = "Dew Point") +
+# Insert an annotation to show the correlation coefficient
+  geom_text(x = max(weather$humid, na.rm = TRUE), y = min(weather$dewp, na.rm = TRUE), label = paste("Correlation:", round(correlation_humid_dewp, 4)), hjust = 1, vjust = 0, color = "black", size = 4) +
+#Insert axis labels 
+   labs(x = "Humidity", y = "Dew Point") +
+# Insert a title
   ggtitle("Dew point tends to rise as humidity rises") +
   theme_minimal()
 
 
+# To show the relationship between precipitation and visibility, perform the exact same operation as for humidity and precipitation, changing the variables as necessary
 correlation_precip_visib <- cor(weather$precip, weather$visib, use = "complete.obs")
 
 ggplot(weather, aes(x = precip, y = visib)) +
@@ -219,7 +239,10 @@ ggplot(weather, aes(x = precip, y = visib)) +
   labs(x = "Precipitation", y = "Visibility") +
   ggtitle("Visibility tends to fall as precipitation rises, but the relationship is not strong") +
   theme_minimal()+
+# Set the lower limit on the y-axis to zero so ensure the image isn't distorted.
   ylim(0,NA)
+
+# Notably, the graph doesn't show a particularly compelling relationship between the two variables, in spite of the correlation coefficient, which shows some relationship. This could be because the visibility variable is divided into different bins
 ```
 
 ## Problem 5: Use the `flights` and `planes` tables to answer the following questions:
@@ -231,54 +254,64 @@ ggplot(weather, aes(x = precip, y = visib)) +
 ```
 
 ```{r}
-
-view(flights)
-
+# To count how many planes have a missing date of manufacture, simply filter the planes year (of manufacture) variable in the planes dataframe for all "NA" results
 planes %>% 
   filter(is.na(year)) %>% 
   count()
 
-top_manufacturers <- planes %>%
-  group_by(manufacturer) %>%
-  summarise(count = n()) %>%
-  top_n(5, wt = count) %>%
-  pull(manufacturer)
-
+# To find the five most common manufacturers, create a new dataframe from planes which is grouped by manufacturer (since we will be sorting by this variable)
 manufacturer_count <- planes %>% 
   group_by(manufacturer) %>%
+# Recode the observations in the manufacturer column to align the spelling of inconsistentently recorded manufacturer titles
   mutate(manufacturer=recode(manufacturer,"AIRBUS INDUSTRIE" = "AIRBUS","MCDONNELL DOUGLAS AIRCRAFT CO" = "MCDONNELL DOUGLAS","MCDONNELL DOUGLAS CORPORATION" = "MCDONNELL DOUGLAS")) %>% 
+# Create another column counting the number of manufacturers
   summarise(count=n()) %>% 
-  arrange(desc(count))
+# Arrange the tibble in descending order by this count 
+   arrange(desc(count))
 
+# Using the manufacturer_count tibble we just created, create a list of the top
 top_manufacturers <- top_n(manufacturer_count, 5, count)
 
+print(top_manufacturers)
+
+# We can see that Boeing and Airbus are the leading manufacturers
+
+
+# To show how the distribution of manufacturers has changed over time as reflected by the airplanes flying from NYC in 2013, we will show how this distribution changes on a day-by-day basis for 2013
+
+# First import the lubridate library to allow us to manipulate date settings in the flights library
 library(lubridate)
 
+# Then create a new variable in this tibble called day_of_year that records the specific day of the year (between 1 and 365) based on the available year, month and day variables already provided
 flights_updated <- flights %>%
   mutate(day_of_year = yday(ymd(paste(year, month, day, sep = "-"))))
 
+# Using this new tibble, filter out cancelled flights
 completed_flights<-flights_updated %>% 
   filter(!is.na(dep_time))
 
+# Right join the planes dataframe to the completed_flights data frame, using a right join so that individual flight records are not lost. In doing this, we select only the tailnum, manufacturer and year variables form the planes tibble and change the title of year to build_year to avoid a clash with the existing variable in flights
 flights_with_manufacturers <-right_join(completed_flights,planes %>% 
-                                         select(tailnum, manufacturer) %>% 
-                                          mutate(manufacturer=recode(manufacturer,"AIRBUS INDUSTRIE" = "AIRBUS","MCDONNELL DOUGLAS AIRCRAFT CO" = "MCDONNELL DOUGLAS","MCDONNELL DOUGLAS CORPORATION" = "MCDONNELL DOUGLAS")), by = "tailnum")
+  select(tailnum, manufacturer, build_year=year) %>% 
+# Perform the same renaming mutation as above
+    mutate(manufacturer=recode(manufacturer,"AIRBUS INDUSTRIE" = "AIRBUS","MCDONNELL DOUGLAS AIRCRAFT CO" = "MCDONNELL DOUGLAS","MCDONNELL DOUGLAS CORPORATION" = "MCDONNELL DOUGLAS")), by = "tailnum")
 
+# From this tibble, create another tibble that mutates all observations in the manufacturer variable. By referring to the top_manufacturers list we created above, we identify anything that this not in that list as "Other"
 updated_flights_with_manufacturers <- flights_with_manufacturers %>%
   mutate(manufacturer = case_when(
     manufacturer %in% top_manufacturers$manufacturer ~ manufacturer,
     TRUE ~ "Other")) %>% 
+# Group by day_of_year first and then by manufacturer, since we will be sorting by both in that order, and provide a count of each flight
   group_by(day_of_year,manufacturer) %>% 
   summarise(count=n())
 
-view(updated_flights_with_manufacturers)
+print(updated_flights_with_manufacturers)
 
+# Plot this tibble as an area graph, with the day of the year on the x-axis showing how the distribution of flights has changed on a daily basis throughout 2013 among the manufacturers
 ggplot(updated_flights_with_manufacturers, aes(x = day_of_year, y = count, fill = manufacturer, group = manufacturer)) +
   geom_area() +
-  labs(x = "Time", y = "No. flights") +
+  labs(x = "Day of year (out of 365)", y = "No. flights") +
   theme_minimal()
-
-
 ```
 
 ## Problem 6: Use the `flights` and `planes` tables to answer the following questions:
@@ -289,6 +322,28 @@ ggplot(updated_flights_with_manufacturers, aes(x = day_of_year, y = count, fill 
 ```
 
 ```{r}
+# To see the oldest plane, using the flights_with_manufacturers tibble we created earlier, filter out all results where no build year is recorded
+oldest_plane <- flights_with_manufacturers %>%
+  filter(!is.na(build_year)) %>%
+# Then sort by build year (ascending, so oldest first)
+  arrange(build_year) %>% 
+# Then take only the first result
+  slice(1)
+
+# Print out only the tailnum column from this resulting tibble
+print(oldest_plane["tailnum"])
+
+
+# To see how many airplanes that flew from NYC are included in the planes table, first create a new tibble from the flights_with_manufacturers tibble we created earlier
+total_distinct_planes<-flights_with_manufacturers %>% 
+# Filter out non-recored build years and tail numbers 
+  filter(!is.na(build_year)&!is.na(tailnum)) %>%
+# Record only distinct tail numbers (i.e. don't permit duplicates)
+  distinct(tailnum) %>% 
+# Take a count of the total number of rows
+  summarise(total_distinct_planes=n())
+
+print(total_distinct_planes)
 
 ```
 
@@ -301,12 +356,57 @@ ggplot(updated_flights_with_manufacturers, aes(x = day_of_year, y = count, fill 
 
 ```{r}
 
+# To find the median arrival delay on a month-by-month basis in each airport, first find the median arrival delay from the flights table
+median_arrival_delay <- flights %>%
+# Filter out cancelled flights
+  filter(!is.na(dep_time)) %>%
+# Group by month and then destination, since we are sorting by these variables
+  group_by(month, dest) %>%
+# Create a new column capturing the median arrival delay and filtering out non-recorded results
+  summarise(median__arr_delay = median(arr_delay, na.rm = TRUE)) %>%
+  arrange(dest, month)
+
+print(median_arrival_delay)
+
+# The below is another way of arranging this data by grouping by month
+flights %>%
+  filter(!is.na(arr_delay)) %>%
+  group_by(month, dest) %>%
+  summarise(median_arr_delay = median(arr_delay, na.rm = TRUE)) %>%
+  arrange(month, dest)
+
+# To plot the median arrival delay for each month and origin airport, first filter out all results where no arrival delay observation is recorded
+flights %>%
+  filter(!is.na(arr_delay)) %>%
+# Group by the variables by which we will be arranging the data 
+  group_by(origin, month, carrier) %>%
+# Calculate the median arrival delay in the same way as above
+  summarise(median_arr_delay = median(arr_delay, na.rm = TRUE)) %>%
+# Plot the results on a scatter plot and facet wrap for origin airport for simplicity, with different colours for each carrier and each graph recording the months on the x-axis
+  ggplot() +
+  geom_point(aes(x = factor(month), y = median_arr_delay, color = carrier)) +
+  facet_wrap(vars(origin), nrow = 2, scales = "free", labeller = label_both) +
+  labs(x = "Month", y = "Median Arrival Delay", color = "Carrier") +
+  ggtitle("Median Arrival Delay by Month for Each Airport and Carrier") +
+  theme_minimal()
 ```
 
 ## Problem 8: Let's take a closer look at what carriers service the route to San Francisco International (SFO). Join the `flights` and `airlines` tables and count which airlines flew the most to SFO. Produce a new dataframe, `fly_into_sfo` that contains three variables: the `name` of the airline, e.g., `United Air Lines Inc.` not `UA`, the count (number) of times it flew to SFO, and the `percent` of the trips that that particular airline flew to SFO.
 
 ```{r}
+fly_into_sfo<- flights %>%
+# Left join the airlines tibble to the flights tibble by the carrier variable
+  left_join(airlines,by="carrier") %>% 
+# Filter in only SFO as the destination variable
+  filter(dest == "SFO") %>%
+# Group by name, since the new dataframe will count the number of flights for each name 
+  group_by(name) %>%
+# Count the number of flights for each name, recording this as "count"
+  summarise(count = n()) %>%
+# Create a new column that records the count of each airline as a percentage of total flights to SFO
+  mutate(percent_to_sfo = count / sum(count) * 100)
 
+fly_into_sfo
 ```
 
 And here is some bonus ggplot code to plot your dataframe
@@ -376,6 +476,9 @@ cancellations <- flights %>%
   # a cancelled flight is one with no `dep_time` 
   filter(is.na(dep_time))
 
+
+# First I would create a new dataframe that filters for only Newark and JFK as departure destinations, or filters out Laguardia. I would group this by month and then carrier. Then I would generate a geom_bar plot facet wrapped first by origin and then by carrier
+
 ```
 
 I want you to think how we would organise our data manipulation to create the following plot. No need to write the code, just explain in words how you would go about it.
@@ -395,7 +498,7 @@ The age gaps dataset includes "gender" columns, which always contain the values 
 The following is a data dictionary of the variables used
 
 | variable            | class     | description                                                                                             |
-|:-----------------|:-----------------|:------------------------------------|
+|:-----------|:-----------|:----------------------------------------------|
 | movie_name          | character | Name of the film                                                                                        |
 | release_year        | integer   | Release year                                                                                            |
 | director            | character | Director of the film                                                                                    |
@@ -423,7 +526,7 @@ How would you explore this data set? Here are some ideas of tables/ graphs to he
 
 -   The `half plus seven\` rule. Large age disparities in relationships carry certain stigmas. One popular rule of thumb is the [half-your-age-plus-seven](https://en.wikipedia.org/wiki/Age_disparity_in_sexual_relationships#The_.22half-your-age-plus-seven.22_rule) rule. This rule states you should never date anyone under half your age plus seven, establishing a minimum boundary on whom one can date. In order for a dating relationship to be acceptable under this rule, your partner's age must be:
 
-$$\frac{\text{Your age}}{2} + 7 \\\< \text{Partner Age} \\\< (\text{Your age} - 7) \\\* 2$$
+$$\frac{\text{Your age}}{2} + 7 \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\< \text{Partner Age} \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\< (\text{Your age} - 7) \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\* 2$$
 How frequently does this rule apply in this dataset?
 
 -   Which movie has the greatest number of love interests?
