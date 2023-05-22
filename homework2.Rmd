@@ -347,34 +347,12 @@ view(card_fraud)
 
 # Calculate the likelihood of fraudulent transactions
 fraud_likelihood <- card_fraud %>%
-  summarise(likelihood = mean(is_fraud)) %>% 
-  print()
-
-# Generate a table summarizing the number and frequency of fraudulent transactions per year
-fraud_summary <- transactions %>%
-  group_by(trans_year) %>%
-  summarise(num_fraud = sum(is_fraud), frequency = num_fraud / n())
-
-# Print the likelihood of fraudulent transactions
-print(fraud_likelihood)
-
-# Print the table summarizing fraudulent transactions per year
-print(fraud_summary)
-
-fly_into_sfo<- flights %>%
-# Left join the airlines tibble to the flights tibble by the carrier variable
-  left_join(airlines,by="carrier") %>% 
-# Filter in only SFO as the destination variable
-  filter(dest == "SFO") %>%
-# Group by name, since the new dataframe will count the number of flights for each name 
-  group_by(name) %>%
-# Count the number of flights for each name, recording this as "count"
-  summarise(count = n()) %>%
-# Create a new column that records the count of each airline as a percentage of total flights to SFO
-  mutate(percent_to_sfo = round(count / sum(count) * 100,2))
-
-fly_into_sfo
-
+  group_by(trans_year,is_fraud) %>% 
+  count() %>% 
+  group_by(trans_year) %>% 
+  mutate(Total_Transactions = sum(n), Percentage_fraudulent = n / Total_Transactions * 100) %>%  
+  filter(is_fraud == 1) %>% 
+  print
 
 ```
 
@@ -382,18 +360,98 @@ fly_into_sfo
 
 ```{r}
 
+fraud_cost <- card_fraud %>%
+  group_by(trans_year) %>% 
+  filter(is_fraud == 1) %>%
+  summarise(total_loss = paste("$",sum(amt))) %>% 
+  print()
+
+# Generate a table summarizing total legitimate and fraudulent transactions per year
+transaction_summary <- card_fraud %>%
+  group_by(trans_year, is_fraud) %>%
+  summarise(total_amount = sum(amt)) %>%
+  pivot_wider(names_from = is_fraud, values_from = total_amount, names_prefix = "total_") %>%
+  mutate(Percentage_fraud = total_1 / (total_0 + total_1) * 100) %>% 
+
+print(fraud_cost)
+
+print(transaction_summary)
+
+
+
 ```
 
 -   Generate a histogram that shows the distribution of amounts charged to credit card, both for legitimate and fraudulent accounts. Also, for both types of transactions, calculate some quick summary statistics.
 
 ```{r}
 
+# Filter the dataframe for legitimate and fraudulent transactions separately
+legitimate <- card_fraud %>% filter(is_fraud == 0)
+fraudulent <- card_fraud %>% filter(is_fraud == 1)
+
+# Create a histogram for legitimate transactions
+ggplot(legitimate, aes(x = amt)) +
+  geom_histogram(binwidth = 100) +
+  labs(title = "Distribution of Amounts Charged (Legitimate)",
+       x = "Amount",
+       y = "Frequency")
+
+# Create a histogram for fraudulent transactions
+fraud_hist <- ggplot(fraudulent, aes(x = amt)) +
+  geom_histogram(binwidth = 100) +
+  labs(title = "Distribution of Amounts Charged (Fraudulent)",
+       x = "Amount",
+       y = "Frequency")
+
+# Calculate summary statistics for legitimate transactions
+leg_summary <- legitimate %>% 
+  summarise(min_amt = min(amt),
+            max_amt = max(amt),
+            median_amt = median(amt),
+            mean_amt = mean(amt))
+
+# Calculate summary statistics for fraudulent transactions
+fraud_summary <- fraudulent %>% 
+  summarise(min_amt = min(amt),
+            max_amt = max(amt),
+            median_amt = median(amt),
+            mean_amt = mean(amt))
+
+# Print the summary statistics
+print(leg_summary)
+print(fraud_summary)
+
+# Display the histograms
+print(leg_hist)
+print(fraud_hist)
+
+
+
 ```
 
 -   What types of purchases are most likely to be instances of fraud? Consider category of merchants and produce a bar chart that shows % of total fraudulent transactions sorted in order.
 
 ```{r}
+# Calculate the percentage of total fraudulent transactions for each category
+fraud_category <- fraudulent %>%
+  group_by(category) %>%
+  summarise(total_fraud = n()) %>%
+  mutate(percentage = (total_fraud / sum(total_fraud)) * 100) %>%
+  arrange(desc(percentage))
 
+# Create a bar chart showing the percentage of total fraudulent transactions for each category
+fraud_chart <- ggplot(fraud_category, aes(x = reorder(category, -percentage), y = percentage)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Percentage of Total Fraudulent Transactions by Merchant Category",
+       x = "Merchant Category",
+       y = "Percentage") +
+  coord_flip()
+
+# Print the data table summarizing the fraudulent transactions by category
+print(fraud_category)
+
+# Display the bar chart
+print(fraud_chart)
 ```
 
 -   When is fraud more prevalent? Which days, months, hours? To create new variables to help you in your analysis, we use the `lubridate` package and the following code
@@ -416,6 +474,67 @@ mutate(
 ```
 
 ```{r}
+library(lubridate)
+
+time_updated_card_fraud<-card_fraud %>% 
+  mutate(
+  date_only = lubridate::date(trans_date_trans_time),
+  month_name = lubridate::month(trans_date_trans_time, label=TRUE),
+  hour = lubridate::hour(trans_date_trans_time),
+  weekday = lubridate::wday(trans_date_trans_time, label = TRUE)
+  )
+
+view(time_updated_card_fraud)
+
+# Analyse fraud prevalence by day of the week
+fraud_by_day <- time_updated_card_fraud %>%
+  filter(is_fraud == 1) %>%
+  group_by(weekday) %>%
+  summarise(total_fraud = n()) %>%
+  arrange(desc(total_fraud)) %>% 
+  ggplot(aes(x = weekday, y = total_fraud)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Day of the Week", y = "Frequency", title = "Fraud Prevalence by Day of the Week") +
+  theme_minimal()
+
+# Analyse fraud prevalence by month
+fraud_by_month <- time_updated_card_fraud %>%
+  filter(is_fraud == 1) %>%
+  group_by(month_name) %>%
+  summarise(total_fraud = n()) %>%
+  arrange(desc(total_fraud)) %>% 
+  ggplot(aes(x = month_name, y = total_fraud)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Month", y = "Frequency", title = "Fraud Prevalence by month") +
+  theme_minimal()
+
+# Analyse fraud prevalence by hour
+fraud_by_hour <- time_updated_card_fraud %>%
+  filter(is_fraud == 1) %>%
+  group_by(hour) %>%
+  summarise(total_fraud = n()) %>%
+  arrange(hour) %>% 
+  ggplot(aes(x = hour, y = total_fraud)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Hour of day", y = "Frequency", title = "Fraud Prevalence by Hour") +
+  theme_minimal()
+
+# Print the results
+print(fraud_by_day)
+print(fraud_by_month)
+print(fraud_by_hour)
+
+
+
+# To determine whether certain age groups are more vulnerable:
+
+age_updated_card_fraud<- card_fraud %>% 
+  mutate(
+   age = interval(dob, trans_date_trans_time) / years(1),
+    )
+
+
+
 
 ```
 
@@ -540,7 +659,9 @@ There is a lot of explanatory text, comments, etc. You do not need these, so del
 
 **Please seek out help when you need it,** and remember the [15-minute rule](https://dsb2023.netlify.app/syllabus/#the-15-minute-rule){target="_blank"}. You know enough R (and have enough examples of code from class and your readings) to be able to do this. If you get stuck, ask for help from others, post a question on Slack-- and remember that I am here to help too!
 
-> As a true test to yourself, do you understand the code you submitted and are you able to explain it to someone else?
+> As a true test to yourself, do you understand the code you submitted and are you able to explain it to someone else? 
+
+<!-- For the most part, yes. But there were certainly points where I borrowed sections that I didn't fully understand syntax-wise and pasted them into my code to make something work. --> -->
 
 # Rubric
 
