@@ -177,20 +177,62 @@ print(mass_shootings)
 # Count the number of mass shootings per month
 shootings_per_month <- mass_shootings %>%
   group_by(month) %>%
-  summarise(shootings = n()) %>%  
+  summarise(shootings = n()) %>% 
+  mutate(month_num = as.numeric(match(month, month.abb))) %>% 
+  mutate(month = fct_reorder(month, month_num, max)) %>%
+  arrange(month_num) %>% 
   ggplot(aes(x = month, y = shootings)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   labs(x = "Month", y = "Number of Mass Shootings") +
-  ggtitle("Mass Shootings by Month") +
+  ggtitle("Most mass shootings occur in February") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(shootings_per_month)
 
 ```
 
 -   How does the distribution of mass shooting fatalities differ between White and Black shooters? What about White and Latino shooters?
 
 ```{r}
+library(ggplot2)
 
+# Filter the data for white and black shooters
+white_black_split <- mass_shootings %>%
+  filter(race %in% c("White", "Black") & !is.na(race) & race != "Latino")  %>%
+  mutate(month_num = as.numeric(match(month, month.abb))) %>% 
+  mutate(month = fct_reorder(month, month_num, max)) %>% 
+  select(race, fatalities, month, month_num) 
+
+
+# Create a bar plot to visualize the distribution
+ggplot(racial_breakdown, aes(x = month, fill = race)) +
+  geom_bar(position = "stack", stat = "sum", aes(y = fatalities)) +
+  scale_fill_manual(values = c("White" = "blue", "Black" = "red")) +
+  labs(x = "Month", y = "Number of Fatalities", fill = "Race") +
+  ggtitle("Distribution of Fatalities for White and Black Shootings by Month")
+
+# The bar chart below represents the racial breakdown of shooters between white and black
+ggplot(white_black_split, aes(x = month, fill = race)) +
+  geom_bar(position = "fill", aes(y = (..count..)/sum(..count..))) +
+  scale_fill_manual(values = c("White" = "blue", "Black" = "red")) +
+  labs(x = "Month", y = "Percentage", fill = "Race") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  ggtitle("White shooters generally outnumber black shooters, except in February")
+
+
+# Recreate the code above, this time filtering for white and latino shooters and removing black shooters.
+white_latino_split <- mass_shootings %>%
+  filter(race %in% c("White", "Latino") & !is.na(race) & race != "Black")  %>%
+  mutate(month_num = as.numeric(match(month, month.abb))) %>% 
+  mutate(month = fct_reorder(month, month_num, max))
+
+# Create a bar plot to visualize the distribution
+ggplot(white_latino_split, aes(x = month, fill = race)) +
+  geom_bar(position = "stack", stat = "sum", aes(y = fatalities)) +
+  scale_fill_manual(values = c("White" = "blue", "Latino" = "red")) +
+  labs(x = "Month", y = "Number of Fatalities", fill = "Race") +
+  ggtitle("Distribution of Fatalities for White and Black Shootings by Month")
 ```
 
 ### Very open-ended
@@ -199,11 +241,56 @@ shootings_per_month <- mass_shootings %>%
 
 ```{r}
 
+# Filter the data for rows with known mental illness status
+mass_shootings_with_illness <- mass_shootings[!is.na(mass_shootings$prior_mental_illness), ]
+
+# Reshape the data into long format
+reshaped_data <- pivot_longer(mass_shootings_with_illness, cols = c(fatalities, injured, total_victims),
+                              names_to = "Variable", values_to = "Count")
+
+print(reshaped_data)
+
+# Create a bar plot facet-wrapped by fatalities, injuries, and total victims
+ggplot(reshaped_data, aes(x = prior_mental_illness, y = Count, fill = prior_mental_illness)) +
+  geom_bar(stat = "summary", fun = "mean", position = "dodge", alpha = 0.5) +
+  facet_wrap(~ Variable, scales = "free_y") +
+  labs(x = "Prior Mental Illness", y = "Mean", fill = "Prior mental illness") +
+  ggtitle("On average, shooters with prior-reported mental illnesses are more dangerous")
+
+
+
 ```
 
 -   Assess the relationship between mental illness and total victims, mental illness and location type, and the intersection of all three variables.
 
 ```{r}
+
+# Filter the data for rows with known prior_mental_illness status and location_type
+mass_shootings_updated <- mass_shootings[!is.na(mass_shootings$prior_mental_illness) & !is.na(mass_shootings$location_type), ]
+
+# Assess the relationship between prior_mental_illness and total_victims
+ggplot(mass_shootings_updated, aes(x = prior_mental_illness, y = total_victims)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(x = "Prior Mental Illness", y = "Total Victims") +
+  ggtitle("Shooters with mental illnesses tend to claim more victims")
+
+# We can see from this graph that both the average number of victims and variability of victims is higher for shooters with mental illness
+
+# Assess the relationship between prior_mental_illness and location_type
+ggplot(mass_shootings_updated, aes(x = prior_mental_illness, fill = location_type)) +
+  geom_bar(position = "fill") +
+  labs(x = "Prior Mental Illness", y = "Proportion", fill = "Location Type") +
+  ggtitle("Mentally ill shooters are more likely to target airports, military bases and religious site")
+
+# We can see here that there is a fairly even distribution of shooting locations among mentally ill and non-mentally ill shooters, however mentally ill shooters are target these other niche locations while non-mentally ill shooters do not 
+
+# Assess the intersection of prior_mental_illness, location_type, and total_victims
+ggplot(mass_shootings_updated, aes(x = prior_mental_illness, fill = location_type, y = total_victims)) +
+  geom_boxplot() +
+  labs(x = "Prior Mental Illness", y = "Total Victims", fill = "Location Type") +
+  ggtitle("Mentally ill shooters are more lethal")
+
+# We can see here that mean victims and standard deviations of total victims is higher at all location types for mentally ill shooters as compared with shooters with no prior reported mental illness (with emphasis on "reported"). We can also see that most shooters - either mentally ill or not - tend to cause the most damage at schools.
 
 ```
 
@@ -253,6 +340,41 @@ The data dictionary is as follows
 -   In this dataset, how likely are fraudulent transactions? Generate a table that summarizes the number and frequency of fraudulent transactions per year.
 
 ```{r}
+library(dplyr)
+library(tidyr)
+
+view(card_fraud)
+
+# Calculate the likelihood of fraudulent transactions
+fraud_likelihood <- card_fraud %>%
+  summarise(likelihood = mean(is_fraud)) %>% 
+  print()
+
+# Generate a table summarizing the number and frequency of fraudulent transactions per year
+fraud_summary <- transactions %>%
+  group_by(trans_year) %>%
+  summarise(num_fraud = sum(is_fraud), frequency = num_fraud / n())
+
+# Print the likelihood of fraudulent transactions
+print(fraud_likelihood)
+
+# Print the table summarizing fraudulent transactions per year
+print(fraud_summary)
+
+fly_into_sfo<- flights %>%
+# Left join the airlines tibble to the flights tibble by the carrier variable
+  left_join(airlines,by="carrier") %>% 
+# Filter in only SFO as the destination variable
+  filter(dest == "SFO") %>%
+# Group by name, since the new dataframe will count the number of flights for each name 
+  group_by(name) %>%
+# Count the number of flights for each name, recording this as "count"
+  summarise(count = n()) %>%
+# Create a new column that records the count of each airline as a percentage of total flights to SFO
+  mutate(percent_to_sfo = round(count / sum(count) * 100,2))
+
+fly_into_sfo
+
 
 ```
 
