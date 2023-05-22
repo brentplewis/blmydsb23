@@ -66,8 +66,7 @@ yearly_shootings_summary <- mass_shootings %>%
   arrange(year)
 
 print(yearly_shootings_summary)
-
--   Generate a bar chart that identifies the number of mass shooters associated with each race category. The bars should be sorted from highest to lowest and each bar should show its number.
+```
 
 ```{r}
 library(ggplot2)
@@ -93,7 +92,6 @@ ggplot(shooter_counts, aes(x = reorder(race, -Shooters), y = Shooters)) +
   ggtitle("Most mass shooters in the US are white") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
 
 ```
 
@@ -147,19 +145,6 @@ print(paste("Number of white males with prior signs of mental illness initiating
 ```{r}
 library(lubridate)
 
-
-# Create a custom vector mapping abbreviated month names to numbers
-abbreviated_months <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
-                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-
-month_numbers <- 1:12  # Numeric values corresponding to the months
-
-# Convert abbreviated month names to numbers in the dataframe
-mass_shootings$month <- month_numbers[match(mass_shootings$month, abbreviated_months)]
-
-print(mass_shootings)
-
-
 # Count the number of mass shootings per month
 shootings_per_month <- mass_shootings %>%
   group_by(month) %>%
@@ -192,7 +177,7 @@ white_black_split <- mass_shootings %>%
 
 
 # Create a bar plot to visualize the distribution
-ggplot(racial_breakdown, aes(x = month, fill = race)) +
+ggplot(white_black_split, aes(x = month, fill = race)) +
   geom_bar(position = "stack", stat = "sum", aes(y = fatalities)) +
   scale_fill_manual(values = c("White" = "blue", "Black" = "red")) +
   labs(x = "Month", y = "Number of Fatalities", fill = "Race") +
@@ -344,13 +329,9 @@ transaction_summary <- card_fraud %>%
   group_by(trans_year, is_fraud) %>%
   summarise(total_amount = sum(amt)) %>%
   pivot_wider(names_from = is_fraud, values_from = total_amount, names_prefix = "total_") %>%
-  mutate(Percentage_fraud = total_1 / (total_0 + total_1) * 100) %>% 
-
-print(fraud_cost)
+  mutate(Percentage_fraud = total_1 / (total_0 + total_1) * 100)
 
 print(transaction_summary)
-
-
 
 ```
 
@@ -363,7 +344,7 @@ legitimate <- card_fraud %>% filter(is_fraud == 0)
 fraudulent <- card_fraud %>% filter(is_fraud == 1)
 
 # Create a histogram for legitimate transactions
-ggplot(legitimate, aes(x = amt)) +
+leg_hist <- ggplot(legitimate, aes(x = amt)) +
   geom_histogram(binwidth = 100) +
   labs(title = "Distribution of Amounts Charged (Legitimate)",
        x = "Amount",
